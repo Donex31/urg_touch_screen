@@ -1,10 +1,9 @@
 #include <iostream>
-#include <windows.h>
 #include "Service.h"
 
 int main()
 {
-    std::string localhost = "127.0.0.1";
+    std::string localhost = "192.168.1.20";
     std::string port = "8888";
     std::string endpoint = "/api/v1/";
 

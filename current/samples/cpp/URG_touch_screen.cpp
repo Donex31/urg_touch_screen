@@ -2,7 +2,7 @@
 #include "math_utilities.h"
 #include "URG_touch_screen.h"
 #include <iostream>
-#include <curl/curl.h>
+#include <cpr/cpr.h>
 
 using namespace qrk;
 using namespace std;
@@ -35,7 +35,7 @@ void  URG_touch_screen::start_reading_data_from_sensor(string shape)
 
 	// Gets measurement data
 	// Case where the measurement range (start/end steps) is defined
-	urg.set_scanning_parameter(urg.deg2step(0), urg.deg2step(+90), 0);
+	urg.set_scanning_parameter(urg.deg2step(-90), urg.deg2step(0), 0);
 	
 	
 	long screen_max_x = 640;
@@ -113,27 +113,27 @@ void  URG_touch_screen::start_reading_data_from_sensor(string shape)
 
 void URG_touch_screen::send_request_to_xinuk(long x, long y, string shape) {
 
-	CURL* curl;
-	CURLcode res;
-	curl = curl_easy_init();
 
-	if (curl) 
-	{
 		string port = ":8000";
 
-		string url_1 = "http://192.168.100.180";
-		string url_2 = "http://192.168.100.185";
-		string url_3 = "http://192.168.100.191";
-		string url_4 = "http://192.168.100.192";
+		string url_1 = "http://192.168.1.87";
+		string url_2 = "http://192.168.1.172";
+		string url_3 = "http://192.168.1.205";
+		string url_4 = "http://192.168.1.196";
 
 		url_1.append(port);
 		url_2.append(port);
 		url_3.append(port);
 		url_4.append(port);
 
-		char query[50];
-		int n = sprintf(query, "/%d/%d", x, y);
+		long one_screen_x = 32;
+		long one_screen_y = 32;
 
+		char query[50];
+		int n;
+
+		cpr::Response r;
+	
 		switch (shapes[shape])
 		{
 		case 0: //squere
@@ -142,16 +142,16 @@ void URG_touch_screen::send_request_to_xinuk(long x, long y, string shape) {
 				if (x < 32)
 				{
 					//send to 1
-					curl_easy_setopt(curl, CURLOPT_URL, url_1.append(query));
-					res = curl_easy_perform(curl);
-					curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y);
+					r = cpr::Get(cpr::Url{url_1.append(query)});
+					cout<<r.status_code<<endl;
 				}
 				else
 				{
 					//send to 2
-					curl_easy_setopt(curl, CURLOPT_URL, url_2.append(query));
-					res = curl_easy_perform(curl);
-					curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x - one_screen_x, y);
+					r = cpr::Get(cpr::Url{url_2.append(query)});
+					cout<<r.status_code<<endl;
 				}
 			}
 			else
@@ -159,16 +159,16 @@ void URG_touch_screen::send_request_to_xinuk(long x, long y, string shape) {
 				if (x < 32)
 				{
 					//send to 3
-					curl_easy_setopt(curl, CURLOPT_URL, url_3.append(query));
-					res = curl_easy_perform(curl);
-					curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y - one_screen_y);
+					r = cpr::Get(cpr::Url{url_3.append(query)});
+					cout<<r.status_code<<endl;
 				}
 				else
 				{
 					//send to 4
-					curl_easy_setopt(curl, CURLOPT_URL, url_4.append(query));
-					res = curl_easy_perform(curl);
-					curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x - one_screen_x, y - one_screen_y);
+					r = cpr::Get(cpr::Url{url_4.append(query)});
+					cout<<r.status_code<<endl;
 				}
 			}
 			break;
@@ -176,66 +176,65 @@ void URG_touch_screen::send_request_to_xinuk(long x, long y, string shape) {
 			if (y < 32)
 			{
 				//send to 1
-				curl_easy_setopt(curl, CURLOPT_URL, url_1.append(query));
-				res = curl_easy_perform(curl);
-				curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y);
+					r = cpr::Get(cpr::Url{url_1.append(query)});
+					cout<<r.status_code<<endl;
 				break;
 			}
 			if (y < 64)
 			{
 				//send to 2
-				curl_easy_setopt(curl, CURLOPT_URL, url_2.append(query));
-				res = curl_easy_perform(curl);
-				curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y - one_screen_y);
+					r = cpr::Get(cpr::Url{url_2.append(query)});
+					cout<<r.status_code<<endl;
 				break;
 			}
 			if (y < 96)
 			{
 				//send to 3
-				curl_easy_setopt(curl, CURLOPT_URL, url_3.append(query));
-				res = curl_easy_perform(curl);
-				curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y - 2 * one_screen_y);
+					r = cpr::Get(cpr::Url{url_3.append(query)});
+					cout<<r.status_code<<endl;
 				break;
 			}
 			// send to 4
-			curl_easy_setopt(curl, CURLOPT_URL, url_4.append(query));
-			res = curl_easy_perform(curl);
-			curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y - 3 * one_screen_y);
+					r = cpr::Get(cpr::Url{url_4.append(query)});
+					cout<<r.status_code<<endl;
 			break;
 		case 2: //horizontal
 			if (x < 32)
 			{
 				//send to 1
-				curl_easy_setopt(curl, CURLOPT_URL, url_1.append(query));
-				res = curl_easy_perform(curl);
-				curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x, y);
+					r = cpr::Get(cpr::Url{url_1.append(query)});
+					cout<<r.status_code<<endl;
 				break;
 			}
 			if (x < 64)
 			{
 				//send to 2
-				curl_easy_setopt(curl, CURLOPT_URL, url_2.append(query));
-				res = curl_easy_perform(curl);
-				curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x - one_screen_x, y );
+					r = cpr::Get(cpr::Url{url_2.append(query)});
+					cout<<r.status_code<<endl;
 				break;
 			}
 			if (x < 96)
 			{
 				//send to 3
-				curl_easy_setopt(curl, CURLOPT_URL, url_3.append(query));
-				res = curl_easy_perform(curl);
-				curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x - 2 * one_screen_x, y );
+					r = cpr::Get(cpr::Url{url_3.append(query)});
+					cout<<r.status_code<<endl;
 				break;
 			}
 			// send to 4
-			curl_easy_setopt(curl, CURLOPT_URL, url_4.append(query));
-			res = curl_easy_perform(curl);
-			curl_easy_cleanup(curl);
+					n = sprintf(query, "/%d/%d", x - 3 * one_screen_x, y );
+					r = cpr::Get(cpr::Url{url_4.append(query)});
+					cout<<r.status_code<<endl;
 			break;
 		default:
 			break;
 		}
-	}
 
 	
 }
