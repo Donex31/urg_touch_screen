@@ -8,6 +8,7 @@ public:
     Service(const utility::string_t& address, const utility::string_t& port) : Controller(address, port) {}
     ~Service() {}
     void handleGet(http_request message);
+    void handlePost(http_request message);
     void initRestOpHandlers() override;
 private:
     URG_touch_screen sensor;

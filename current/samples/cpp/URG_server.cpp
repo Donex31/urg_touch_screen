@@ -3,9 +3,9 @@
 
 int main()
 {
-    std::string localhost = "192.168.1.20";
+    std::string localhost = "192.168.43.4";
     std::string port = "8888";
-    std::string endpoint = "/api/v1/";
+    std::string endpoint = "/";
 
     Service serv(utility::conversions::to_string_t(localhost), utility::conversions::to_string_t(port));
     serv.setEndpoint(utility::conversions::to_string_t(endpoint));
