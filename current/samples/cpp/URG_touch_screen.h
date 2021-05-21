@@ -7,8 +7,8 @@ class URG_touch_screen {
 
 public:
 	URG_touch_screen();
-	void start_reading_data_from_sensor(int width, int height, double pixel_size, int screen_width, int screen_height);
+	void start_reading_data_from_sensor(int width, int height, double pixel_size, int screen_width, int screen_height, std::string* screens_urls);
 	void stop_reading_data_from_sensor();
-	void send_request_to_xinuk(long x, long y, int width, int height, int screen_width, int screen_height);
+	void send_request_to_xinuk(long x, long y, int width, int height, int screen_width, int screen_height, std::string* screens_urls);
 	void set_work(bool work_value);
 };

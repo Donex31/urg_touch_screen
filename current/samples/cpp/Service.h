@@ -6,7 +6,7 @@
 class Service : public Controller {
 public:
     Service(const utility::string_t& address, const utility::string_t& port) : Controller(address, port) {}
-    ~Service() {}
+    virtual ~Service() {}
     void handleGet(http_request message);
     void handlePost(http_request message);
     void initRestOpHandlers() override;
