@@ -3,7 +3,7 @@
 
 int main()
 {
-    std::string localhost = "192.168.43.4";
+    std::string localhost = "localhost";
     std::string port = "8888";
     std::string endpoint = "/";
 
@@ -11,7 +11,7 @@ int main()
     serv.setEndpoint(utility::conversions::to_string_t(endpoint));
     serv.accept().wait();
 
-    std::cout << "Server start at http//" + localhost + ":" + port + endpoint << std::endl;
+    std::cout << "Server start at http://" + localhost + ":" + port + endpoint << std::endl;
 
     std::getchar();
     return 0;

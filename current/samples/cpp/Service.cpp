@@ -1,5 +1,6 @@
 #include "Service.h"
 #include <string>
+#include <future>
 #pragma warning( disable: 4819 )
 
 using namespace std;
@@ -33,6 +34,7 @@ void Service::handleGet(http_request raquest) {
                 }
             }
             catch (exception& e) {
+                cerr << e.what();
                 raquest.reply(status_codes::BadRequest);
             }
         });
@@ -54,28 +56,38 @@ void Service::handlePost(http_request message) {
                 if (pathEndpoint == "startReadingPositions") {
                     cout << "POST /startReadingPositions"<<endl;
                     int width = val[U("width")].as_number().to_int32();
-                    cout << "width = " << width << endl;
+                    // cout << "width = " << width << endl;
                     int height = val[U("height")].as_number().to_int32();
-                    cout << "height = " << height << endl;
+                    // cout << "height = " << height << endl;
                     double pixel_size = val[U("pixelSize")].as_number().to_double();
-                    cout << "pixelSize = " << pixel_size << endl;
+                    // cout << "pixelSize = " << pixel_size << endl;
                     int screen_width = val[U("screenWidth")].as_number().to_int32();
-                    cout << "screenWidth = " << screen_width << endl;
+                    // cout << "screenWidth = " << screen_width << endl;
                     int screen_height = val[U("screenHeight")].as_number().to_int32();
-                    cout << "sreenHeight = " << screen_height << endl;
+                    // cout << "sreenHeight = " << screen_height << endl;
                     auto urls_array = val[U("hosts")].as_array();
-                    string screens_urls[urls_array.size()];
+                    string* screens_urls = new string[urls_array.size()];
                     
-                    for(int i=0; i<urls_array.size(); ++i)
+                    for(size_t i = 0; i < urls_array.size(); ++i)
                     {
-                        screens_urls[i] = urls_array[i].as_string();
-                        cout << "Host nr "<< i <<": "<< screens_urls[i] << endl;
+                        screens_urls[i] = utility::conversions::to_utf8string(urls_array[i].as_string());
+                        cout << "Host no "<< i <<": "<< screens_urls[i] << endl;
                     }
 
-                    //cout << "width = " << width << " height = " << height << " pixelSize = " << pixel_size << " screenWidth = " << screen_width << " screenHeight = " << screen_height << endl;
-
-                    sensor.start_reading_data_from_sensor(width, height, pixel_size, screen_width, screen_height, screens_urls);
+                    cout << "width = " << width << " height = " << height << " pixelSize = " << pixel_size << " screenWidth = " << screen_width << " screenHeight = " << screen_height << endl;
+                    auto f = async(launch::async, &URG_touch_screen::start_reading_data_from_sensor, std::ref(sensor), width, height, pixel_size, screen_width, screen_height, screens_urls);
                     message.reply(status_codes::OK);
+
+                }
+                else if (pathEndpoint == "calibration") {
+                    cout << "POST /calibration" << endl;
+                    if (sensor.calibrate()) 
+                    {
+                        message.reply(status_codes::OK);
+                    }
+                    else {
+                        message.reply(status_codes::NoContent , "No marker in area!");
+                    }
 
                 }
                 else {
