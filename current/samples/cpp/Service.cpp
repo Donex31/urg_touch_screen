@@ -55,6 +55,9 @@ void Service::handlePost(http_request message) {
                 json::value val = task.get();
                 if (pathEndpoint == "startReadingPositions") {
                     cout << "POST /startReadingPositions"<<endl;
+                    if(!sensor.calibration_end){
+                        message.reply(status_codes::NoContent , "Please make calibration first");
+                    }
                     int width = val[U("width")].as_number().to_int32();
                     // cout << "width = " << width << endl;
                     int height = val[U("height")].as_number().to_int32();
@@ -75,13 +78,24 @@ void Service::handlePost(http_request message) {
                     }
 
                     cout << "width = " << width << " height = " << height << " pixelSize = " << pixel_size << " screenWidth = " << screen_width << " screenHeight = " << screen_height << endl;
-                    auto f = async(launch::async, &URG_touch_screen::start_reading_data_from_sensor, std::ref(sensor), width, height, pixel_size, screen_width, screen_height, screens_urls);
+                    
+                    bool is_tracking_mode = val[U("isTrackingMode")].as_bool();
+                    // cout << "sreenHeight = " << screen_height << endl;
+                    
+                    auto f = async(launch::async, &URG_touch_screen::start_reading_data_from_sensor, std::ref(sensor), width, height, pixel_size, screen_width, screen_height, screens_urls, is_tracking_mode);
                     message.reply(status_codes::OK);
 
                 }
                 else if (pathEndpoint == "calibration") {
                     cout << "POST /calibration" << endl;
-                    if (sensor.calibrate()) 
+                    int width = val[U("width")].as_number().to_int32();
+                    // cout << "width = " << width << endl;
+                    int height = val[U("height")].as_number().to_int32();
+                    // cout << "height = " << height << endl;
+                    double pixel_size = val[U("pixelSize")].as_number().to_double();
+                    // cout << "pixelSize = " << pixel_size << endl;
+                    bool is_point_00 = val[U("isZeroZero")].as_bool();
+                    if (sensor.calibrate(width, height, pixel_size, is_point_00)) 
                     {
                         message.reply(status_codes::OK);
                     }

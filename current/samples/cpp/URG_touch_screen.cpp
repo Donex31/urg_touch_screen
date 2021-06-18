@@ -15,10 +15,25 @@ URG_touch_screen::URG_touch_screen() {
 
 	// Set work
 	work = true;
+	
+	// Set calibration
+	calibratedLT = false;
+	calibratedRB = false;
+	calibration_end = false;
 
 	// Set deflaut corectors
-	correct_x = 0;
-	correct_y = 0;
+	// L - Left
+	// R - Right
+	// T - Top 
+	// B - Bottom
+	p_LT = Point();
+	p_LB = Point();
+	p_RT = Point();
+	p_RB = Point();
+	
+	// Set deflout angles 
+	min_angle_degree = 0;
+	max_angle_degree = 90;
 
 	// Get connection information
 	Connection_information information(true);
@@ -34,20 +49,20 @@ URG_touch_screen::URG_touch_screen() {
 	}
 }
 
-void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, double pixel_size, int screen_width, int screen_height, string* screens_urls)
+void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, double pixel_size, int screen_width, int screen_height, string* screens_urls, bool tracking_point_mode)
 {
 	// Gets measurement data
 	// Case where the measurement range (start/end steps) is defined
 	work = true;
-	urg.set_scanning_parameter(urg.deg2step(90), urg.deg2step(0), 0);
+	urg.set_scanning_parameter(urg.deg2step(max_angle_degree), urg.deg2step(min_angle_degree), 0);
 	
 	int pixel_size_mm = (int)round(pixel_size * 10);
 	
 	long screen_max_x = (width * pixel_size_mm);
 	long screen_max_y = (height * pixel_size_mm);
 
-	long min_distance = urg.min_distance();
-	long max_distance = (long)round(sqrt(pow(screen_max_x + correct_x, 2) + pow(screen_max_y + correct_y, 2)));
+	long min_distance = (long)round(sqrt(pow(p_LT.x, 2) + pow(p_LT.y, 2)));
+	long max_distance = (long)round(sqrt(pow(p_RB.x, 2) + pow(p_RB.y, 2)));
 
 	int scan_times = Urg_driver::Infinity_times;
 	//int scan_times = 50;
@@ -72,6 +87,8 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 		size_t data_n = data.size();
 
 		for (size_t i = 0; i < data_n; ++i) {
+			cout << "test" << endl;
+			
 			long l = data[i];
 			if ((l <= min_distance) || (l >= max_distance)) {
 				continue;
@@ -81,15 +98,15 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 			long y = static_cast<long>(l * cos(radian));
 			long x = static_cast<long>(l * sin(radian));
 
-			long corrected_x = x - correct_x;
-			long corrected_y = y - correct_y;
-
-			if ((corrected_x >= screen_max_x) || (corrected_y >= screen_max_y) || corrected_x < 0 || corrected_y < 0) {
+			if(!is_piont_in_rectangle(p_LT ,p_RT, p_LB, p_RB, x, y)){
 				continue;
 			}
+			
+			float distance_x = distance_point_from_streight(p_LT, p_LB, x, y);
+			float distance_y = distance_point_from_streight(p_LT, p_RT, x, y);
 
-			int x_index = (int)round(corrected_x / pixel_size_mm);
-			int y_index = (int)round(corrected_y / pixel_size_mm);
+			int x_index = (int)round(distance_x / pixel_size_mm);
+			int y_index = (int)round(distance_y / pixel_size_mm);
 
 			if (screen_matrix[y_index][x_index]) {
 				continue;
@@ -132,11 +149,15 @@ void URG_touch_screen::send_request_to_xinuk(int x, int y, int width, int height
 		// cout<<"Status Code: "<<r.status_code<<endl;
 }
 
-bool URG_touch_screen::calibrate() {
+bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool is_point_00) {
+	
+	min_angle_degree = 0;
+	max_angle_degree = 90;
 
-	urg.set_scanning_parameter(urg.deg2step(90), urg.deg2step(0), 0);
+	urg.set_scanning_parameter(urg.deg2step(max_angle_degree), urg.deg2step(min_angle_degree), 0);
 
 	urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
+	
 	int i = 0;
 	while (i<10)
 	{
@@ -148,7 +169,17 @@ bool URG_touch_screen::calibrate() {
 			urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
 		}
 
-		int buffor_size = 200;
+		long buffor_size = 200;
+		
+		if(!is_point_00){
+			
+			int pixel_size_mm = (int)round(pixel_size * 10);
+	
+			long screen_max_x = (width * pixel_size_mm);
+			long screen_max_y = (height * pixel_size_mm);
+
+			long buffor_size = (long) (2 * buffor_size + round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2))));
+		}
 
 		long min_distance = urg.min_distance();
 		long max_distance = (long)round(sqrt(pow(buffor_size, 2) + pow(buffor_size, 2)));
@@ -170,14 +201,55 @@ bool URG_touch_screen::calibrate() {
 				continue;
 			}
 
-			correct_x = x;
-			correct_y = y;
-			cout << "correct X: " << correct_x << " correct Y: " << correct_y << endl;
-			return true;
+			if(is_point_00){
+				p_LT.x = x;
+				p_LT.y = y;
+				cout << "x_LT: " << x << " y_LT: " << y << endl;
+				calibratedLT  = true;
+			}
+			else
+			{
+				p_RB.x = x;
+				p_RB.y = y;
+				cout << "x_RB: " << x << " y_RB: " << y << endl;
+				calibratedRB  = true;
+			}
+			
 		}
 	}
 	
-	return false;
+	if(calibratedLT && calibratedRB)
+	{
+		float x_c = (p_LT.x + p_RB.x) / 2;
+		float x_d = (p_LT.x - p_RB.x) / 2;
+		float y_c = (p_LT.y + p_RB.y) / 2;
+		float y_d = (p_LT.y - p_RB.y) / 2;
+		
+		p_LB.x = x_c - y_d;
+		p_LB.y = y_c + x_d;
+		p_RT.x = x_c + y_d;
+		p_RT.y = y_c - x_d;
+		
+		//Min max angle
+		Point points[4];
+		points[0] = p_LT;
+		points[1] = p_RT;
+		points[2] = p_LB;
+		points[3] = p_RB;
+		Point p_max = find_min(points, true);
+		Point p_min = find_min(points, false);
+		
+		float a_min = p_min.y / p_min.x;
+		float a_max = p_max.y / p_max.x;
+		
+		min_angle_degree = floor(atan(a_min) * (180.0/M_PI));
+		max_angle_degree = ceil(atan(a_max) * (180.0/M_PI));
+		
+		calibration_end = true;
+		
+	}
+	
+	return is_point_00 ? calibratedLT : calibratedRB;
 }
 
 void  URG_touch_screen::stop_reading_data_from_sensor() {
@@ -186,4 +258,61 @@ void  URG_touch_screen::stop_reading_data_from_sensor() {
 
 void  URG_touch_screen::set_work(bool work_value) {
 	work = work_value;
+}
+
+URG_touch_screen::Point URG_touch_screen::find_min(Point* points, bool is_x){
+	
+	Point min_point;
+	min_point.x = numeric_limits<float>::max();
+	min_point.y = numeric_limits<float>::max();
+	
+	if(is_x)
+	{
+		for(int i=0; i < 4; i++)
+		{
+			if(points[i].x < min_point.x)
+				min_point = points[i];
+		}
+	}
+	else
+	{
+		for(int i=0; i < 4; i++)
+		{
+			if(points[i].x < min_point.x)
+				min_point = points[i];
+		}
+	}
+	
+	return min_point;
+}
+
+float URG_touch_screen::area_triangle(float x1, float y1, float x2, float y2, float x3, float y3)
+{
+    return abs((x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2.0);
+}
+ 
+bool URG_touch_screen::is_piont_in_rectangle(Point P1, Point P2, Point P3, Point P4, float x, float y)
+{
+    float A = area_triangle(P1.x, P1.y, P2.x, P2.y, P3.x, P3.y) + area_triangle(P1.x, P1.y, P4.x, P4.y, P3.x, P3.y);
+ 
+    float A1 = area_triangle(x, y, P1.x, P1.y, P2.y, P2.y);
+ 
+    float A2 = area_triangle(x, y, P2.x, P2.y, P3.x, P3.y);
+
+    float A3 = area_triangle(x, y, P3.x, P3.y, P4.x, P4.y);
+ 
+    float A4 = area_triangle(x, y, P1.x, P1.y, P4.x, P4.y);
+ 
+    return (A == A1 + A2 + A3 + A4);
+}
+
+float URG_touch_screen::distance_point_from_streight(Point P1, Point P2, float x, float y){
+	
+	float A = -((P1.y - P2.y) / (P1.x - P2.x));
+	float B = 1;
+	float C = -(P1.y - ((P1.y - P2.y) / (P1.x - P2.x)) * P1.x);
+	
+	float distance = (abs(A*x + B*y + C)) / (sqrt(pow(A, 2) + pow(B, 2)));
+	
+	return distance;
 }
