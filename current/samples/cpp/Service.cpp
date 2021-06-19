@@ -56,6 +56,7 @@ void Service::handlePost(http_request message) {
                 if (pathEndpoint == "startReadingPositions") {
                     cout << "POST /startReadingPositions"<<endl;
                     if(!sensor.calibration_end){
+                        sensor.stop_reading_data_from_sensor();
                         message.reply(status_codes::NoContent , "Please make calibration first");
                     }
                     int width = val[U("width")].as_number().to_int32();

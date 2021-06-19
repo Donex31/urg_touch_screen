@@ -67,6 +67,11 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 	int scan_times = Urg_driver::Infinity_times;
 	//int scan_times = 50;
 	int skip_scan = 0;
+	
+	cout << "min_distance: " << min_distance <<endl; 
+	cout << "max_distance: " << max_distance <<endl; 
+	cout << "min_angle_degree: " << min_angle_degree <<endl; 
+	cout << "max_angle_degree: " << max_angle_degree <<endl; 
 
 	vector<vector<bool>> screen_matrix(height);
 	for (int i = 0; i < height; i++)
@@ -79,16 +84,15 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 		long time_stamp = 0;
 		if (!urg.get_distance(data, &time_stamp)) {
 			cout << "Urg_driver::get_distance(): " << urg.what() << endl;
-			urg.start_measurement(Urg_driver::Distance, scan_times, skip_scan);
+			//urg.start_measurement(Urg_driver::Distance, scan_times, skip_scan);
+			urg.reboot();
 		}
 
 		// Prints the X-Y coordinates for all the measurement points
 
 		size_t data_n = data.size();
 
-		for (size_t i = 0; i < data_n; ++i) {
-			cout << "test" << endl;
-			
+		for (size_t i = 0; i < data_n; ++i) {			
 			long l = data[i];
 			if ((l <= min_distance) || (l >= max_distance)) {
 				continue;
@@ -114,7 +118,7 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 
 			screen_matrix[y_index][x_index] = 1;
 			cout << "(" << x_index << ", " << y_index << ")" << endl;
-			auto f = async(launch::async, &URG_touch_screen::send_request_to_xinuk, this, x_index, y_index, width, height, screen_width, screen_height, screens_urls);
+			//auto f = async(launch::async, &URG_touch_screen::send_request_to_xinuk, this, x_index, y_index, width, height, screen_width, screen_height, screens_urls);
 		}
 	}
 }
@@ -153,11 +157,36 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 	
 	min_angle_degree = 0;
 	max_angle_degree = 90;
-
+	
 	urg.set_scanning_parameter(urg.deg2step(max_angle_degree), urg.deg2step(min_angle_degree), 0);
 
 	urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
 	
+	long buffor_size = 200;
+	
+	cout << "is_point_00: " << is_point_00 << endl;
+	cout << "width: " << width << endl;
+	cout << "height: " << height << endl;
+	cout << "pixel_size: " << pixel_size << endl;
+	
+	long min_distance = urg.min_distance();
+	
+	if(!is_point_00){
+		int pixel_size_mm = (int)round(pixel_size * 10);
+
+		long screen_max_x = (width * pixel_size_mm);
+		long screen_max_y = (height * pixel_size_mm);
+
+		buffor_size = (long) (buffor_size + round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2))));
+		min_distance = round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2)));
+	}
+	
+	long max_distance = buffor_size;
+
+	cout << "min_distance: " << min_distance << endl;
+	cout << "max_distance: " << max_distance << endl;
+
+
 	int i = 0;
 	while (i<10)
 	{
@@ -166,23 +195,9 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 		long time_stamp = 0;
 		if (!urg.get_distance(data, &time_stamp)) {
 			cout << "Urg_driver::get_distance(): " << urg.what() << endl;
-			urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
-		}
-
-		long buffor_size = 200;
-		
-		if(!is_point_00){
+			//urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
 			
-			int pixel_size_mm = (int)round(pixel_size * 10);
-	
-			long screen_max_x = (width * pixel_size_mm);
-			long screen_max_y = (height * pixel_size_mm);
-
-			long buffor_size = (long) (2 * buffor_size + round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2))));
 		}
-
-		long min_distance = urg.min_distance();
-		long max_distance = (long)round(sqrt(pow(buffor_size, 2) + pow(buffor_size, 2)));
 
 		size_t data_n = data.size();
 
@@ -206,6 +221,7 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 				p_LT.y = y;
 				cout << "x_LT: " << x << " y_LT: " << y << endl;
 				calibratedLT  = true;
+				break;
 			}
 			else
 			{
@@ -213,37 +229,67 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 				p_RB.y = y;
 				cout << "x_RB: " << x << " y_RB: " << y << endl;
 				calibratedRB  = true;
+				break;
 			}
 			
 		}
+		
+		if(is_point_00 && calibratedLT)
+			break;
+		if(!is_point_00 && calibratedRB)
+			break;
 	}
 	
 	if(calibratedLT && calibratedRB)
 	{
+		
+		cout << "p_LT.x: "<< p_LT.x << endl;
+		cout << "p_LT.y: "<< p_LT.y << endl;
+		cout << "p_RB.x: "<< p_RB.x << endl;
+		cout << "p_RB.y: "<< p_RB.y << endl;
+		
 		float x_c = (p_LT.x + p_RB.x) / 2;
 		float x_d = (p_LT.x - p_RB.x) / 2;
 		float y_c = (p_LT.y + p_RB.y) / 2;
 		float y_d = (p_LT.y - p_RB.y) / 2;
 		
-		p_LB.x = x_c - y_d;
-		p_LB.y = y_c + x_d;
-		p_RT.x = x_c + y_d;
-		p_RT.y = y_c - x_d;
+		p_RT.x = x_c - y_d;
+		p_RT.y = y_c + x_d;
+		p_LB.x = x_c + y_d;
+		p_LB.y = y_c - x_d;
+		
+		cout << "p_LB.x: "<< p_LB.x << endl;
+		cout << "p_LB.y: "<< p_LB.y << endl;
+		cout << "p_RT.x: "<< p_RT.x << endl;
+		cout << "p_RT.y: "<< p_RT.y << endl;
 		
 		//Min max angle
 		Point points[4];
-		points[0] = p_LT;
-		points[1] = p_RT;
-		points[2] = p_LB;
-		points[3] = p_RB;
-		Point p_max = find_min(points, true);
-		Point p_min = find_min(points, false);
+		// points[0] = p_LT;
+		// points[1] = p_RT;
+		// points[2] = p_LB;
+		// points[3] = p_RB;
+		// Point p_max = find_min(points, false);
+		//Point p_min = find_min(points, true);
 		
-		float a_min = p_min.y / p_min.x;
-		float a_max = p_max.y / p_max.x;
+		// float a_min = p_min.x / p_min.y;
+		float a_min = p_LB.x / p_LB.y;
+		// float a_max = p_max.x / p_max.y;
+		float a_max = p_RT.x / p_RT.y;
+		
+		// cout << "p_max.y: "<< p_max.y << endl;
+		// cout << "p_max.x: "<< p_max.x << endl;
+		// cout << "p_min.y: "<< p_min.y << endl;
+		// cout << "p_min.x: "<< p_min.x << endl;
+		cout << "a_max: "<< a_max << endl;
+		cout << "a_min: "<< a_min << endl;
+
 		
 		min_angle_degree = floor(atan(a_min) * (180.0/M_PI));
 		max_angle_degree = ceil(atan(a_max) * (180.0/M_PI));
+		
+		cout << "min_angle_degree: "<< min_angle_degree << endl;
+		cout << "max_angle_degree: "<< max_angle_degree << endl;
 		
 		calibration_end = true;
 		
@@ -278,7 +324,7 @@ URG_touch_screen::Point URG_touch_screen::find_min(Point* points, bool is_x){
 	{
 		for(int i=0; i < 4; i++)
 		{
-			if(points[i].x < min_point.x)
+			if(points[i].y < min_point.y)
 				min_point = points[i];
 		}
 	}
