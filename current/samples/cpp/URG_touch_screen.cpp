@@ -7,9 +7,59 @@
 #include <vector>
 #include <cmath>
 #include <cstring>
+#include <fstream>
+#include "kf.h"
+#include "ekf.h"
+//#include "ukf.h"
 
 using namespace qrk;
 using namespace std;
+
+//class MyUKF : public UKF
+//{
+//public:
+//	virtual colvec f(const colvec& x, const colvec& u) {
+//		colvec xk(nStates_);
+//		mat A(nStates_, nStates_);
+//
+//		A = A.eye();
+//
+//		xk = A * x;;
+//		return xk;
+//	}
+//
+//	virtual colvec h(const colvec& x) {
+//		colvec zk(nOutputs_);
+//		zk(0) = x(0);
+//		zk(1) = x(1);
+//		return zk;
+//	}
+//
+//};
+
+class MyEKF : public EKF
+{
+public:
+	virtual colvec f(const colvec& x, const colvec& u) {
+		colvec xk(nStates_);
+		mat A(nStates_, nStates_);
+
+		A = A.eye();
+
+		xk = A * x;;
+		return xk;
+	}
+
+	virtual colvec h(const colvec& x) {
+		colvec zk(nOutputs_);
+		zk(0) = x(0);
+		zk(1) = x(1);
+		return zk;
+	}
+
+	static const double dt;
+
+};
 
 URG_touch_screen::URG_touch_screen() {
 
@@ -51,10 +101,13 @@ URG_touch_screen::URG_touch_screen() {
 
 void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, double pixel_size, int screen_width, int screen_height, string* screens_urls, bool tracking_point_mode)
 {
+
+	ofstream myfile;
+	myfile.open("output.txt");
 	// Gets measurement data
 	// Case where the measurement range (start/end steps) is defined
 	work = true;
-	urg.set_scanning_parameter(urg.deg2step(max_angle_degree), urg.deg2step(min_angle_degree), 0);
+	urg.set_scanning_parameter(urg.deg2step(90), urg.deg2step(0), 0);
 	
 	int pixel_size_mm = (int)round(pixel_size * 10);
 	
@@ -73,19 +126,84 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 	cout << "min_angle_degree: " << min_angle_degree <<endl; 
 	cout << "max_angle_degree: " << max_angle_degree <<endl; 
 
-	vector<vector<bool>> screen_matrix(height);
+	vector<vector<int>> screen_matrix(height);
 	for (int i = 0; i < height; i++)
 		screen_matrix[i].resize(width);
 
+	//Kalman Filter
+	int n_states = 2;
+	int n_outputs = 2;
+	mat A(n_states, n_outputs), B(n_states, n_outputs), H(n_states, n_outputs), Q(n_states, n_outputs), R(n_states, n_outputs);
+
+	A << 1 << 0 << endr
+		<< 0 << 1 << endr;
+
+	H << 1 << 0 << endr
+		<< 0 << 1 << endr;
+
+	std::cout << "A: \n" << A << std::endl;
+	std::cout << "H: \n" << H << std::endl;
+
+	B = B.zeros();
+
+	double alpha = 1.5;
+	double sigma = 3;
+
+	Q = alpha * Q.eye();
+
+	R = sigma * R.eye();
+
+	std::cout << "B: \n" << B << std::endl;
+	std::cout << "Q: \n" << Q << std::endl;
+	std::cout << "R: \n" << R << std::endl;
+
+	colvec x0(2);
+	x0 << 0 << 8;
+
+	mat P0(2, 2);
+	P0 = 3 * P0.eye();
+
+	KF kalman;
+	//MyEKF myekf;
+	//MyUKF myukf;
+
+	kalman.InitSystem(A, B, H, Q, R);
+	kalman.InitSystemState(x0);
+	kalman.InitStateCovariance(P0);
+
+	//myekf.InitSystem(n_states, n_outputs, Q, R);
+	//myekf.InitSystemState(x0);
+	//myekf.InitSystemStateCovariance(P0);
+
+	//myukf.InitSystem(n_states, n_outputs, Q, R);
+	//myukf.InitSystemState(x0);
+	//myukf.InitSystemStateCovariance(P0);
+
+	colvec z(2);
+	colvec u(2);
+
+	// No inputs, system subjects only to random perturbation
+	u = u.zeros();
+	//
+
 	urg.start_measurement(Urg_driver::Distance, scan_times, skip_scan);
+	int t = 0;
 	while (work) {
+		t++;
+		if (!t % 11) {
+			for (int i = 0; i < height; i++)
+				for (size_t j = 0; j < width; j++)
+				{
+					if (screen_matrix[i][j] < 8)
+						screen_matrix[i][j] = 0;
+				}
+		}
 
 		vector<long> data;
 		long time_stamp = 0;
 		if (!urg.get_distance(data, &time_stamp)) {
 			cout << "Urg_driver::get_distance(): " << urg.what() << endl;
-			//urg.start_measurement(Urg_driver::Distance, scan_times, skip_scan);
-			urg.reboot();
+			urg.start_measurement(Urg_driver::Distance, scan_times, skip_scan);
 		}
 
 		// Prints the X-Y coordinates for all the measurement points
@@ -99,12 +217,18 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 			}
 
 			double radian = urg.index2rad(i);
+
+
 			long y = static_cast<long>(l * cos(radian));
 			long x = static_cast<long>(l * sin(radian));
 
-			if(!is_piont_in_rectangle(p_LT ,p_RT, p_LB, p_RB, x, y)){
+			if (x < 0 || y < 0) {
 				continue;
-			}
+			};
+
+			/*if(!is_piont_in_rectangle(p_LT ,p_RT, p_LB, p_RB, x, y)){
+				continue;
+			}*/
 			
 			float distance_x = distance_point_from_streight(p_LT, p_LB, x, y);
 			float distance_y = distance_point_from_streight(p_LT, p_RT, x, y);
@@ -112,15 +236,37 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 			int x_index = (int)round(distance_x / pixel_size_mm);
 			int y_index = (int)round(distance_y / pixel_size_mm);
 
-			if (screen_matrix[y_index][x_index]) {
+			if (x_index >= width || y_index >= height) {
 				continue;
 			}
 
-			screen_matrix[y_index][x_index] = 1;
+			screen_matrix[y_index][x_index] = screen_matrix[y_index][x_index] + 1;
+
+			if (screen_matrix[y_index][x_index] != 10) {
+				continue;
+			}
+
+			z(0, 0) = x_index;
+			z(1, 0) = y_index;
+
+			kalman.Kalmanf(z, u);
+			colvec* z = kalman.GetCurrentEstimatedOutput();
+
+			//myekf.EKalmanf(z, u);
+			//colvec* z = myekf.GetCurrentEstimatedOutput();
+
+			//myukf.UKalmanf(z, u);
+			//colvec* z = myukf.GetCurrentEstimatedOutput();
+
+			//x_index = z->at(0, 0);
+			//y_index = z->at(1, 0);
+
 			cout << "(" << x_index << ", " << y_index << ")" << endl;
+			myfile << "(" << x_index << ", " << y_index << "),";
 			//auto f = async(launch::async, &URG_touch_screen::send_request_to_xinuk, this, x_index, y_index, width, height, screen_width, screen_height, screens_urls);
 		}
 	}
+	myfile.close();
 }
 
 void URG_touch_screen::send_request_to_xinuk(int x, int y, int width, int height, int screen_width, int screen_height, string* screens_urls) {
@@ -177,8 +323,8 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 		long screen_max_x = (width * pixel_size_mm);
 		long screen_max_y = (height * pixel_size_mm);
 
+		min_distance = (long) round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2)));
 		buffor_size = (long) (buffor_size + round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2))));
-		min_distance = round(sqrt(pow(screen_max_x, 2) + pow(screen_max_y, 2)));
 	}
 	
 	long max_distance = buffor_size;
@@ -195,8 +341,7 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 		long time_stamp = 0;
 		if (!urg.get_distance(data, &time_stamp)) {
 			cout << "Urg_driver::get_distance(): " << urg.what() << endl;
-			//urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
-			
+			urg.start_measurement(Urg_driver::Distance, Urg_driver::Infinity_times, 0);
 		}
 
 		size_t data_n = data.size();
@@ -217,16 +362,16 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 			}
 
 			if(is_point_00){
-				p_LT.x = x;
-				p_LT.y = y;
+				p_LT.x = (float)x;
+				p_LT.y = (float)y;
 				cout << "x_LT: " << x << " y_LT: " << y << endl;
 				calibratedLT  = true;
 				break;
 			}
 			else
 			{
-				p_RB.x = x;
-				p_RB.y = y;
+				p_RB.x = (float)x;
+				p_RB.y = (float)y;
 				cout << "x_RB: " << x << " y_RB: " << y << endl;
 				calibratedRB  = true;
 				break;
@@ -239,6 +384,13 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 		if(!is_point_00 && calibratedRB)
 			break;
 	}
+
+	//calibratedLT = true; 
+	//calibratedRB = true;
+	//p_LT.x = 90;
+	//p_LT.y = 50;
+	//p_RB.x = 1900;
+	//p_RB.y = 1900;
 	
 	if(calibratedLT && calibratedRB)
 	{
@@ -285,8 +437,8 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 		cout << "a_min: "<< a_min << endl;
 
 		
-		min_angle_degree = floor(atan(a_min) * (180.0/M_PI));
-		max_angle_degree = ceil(atan(a_max) * (180.0/M_PI));
+		min_angle_degree = (int) floor(atan(a_min) * (180.0/M_PI));
+		max_angle_degree = (int) ceil(atan(a_max) * (180.0/M_PI));
 		
 		cout << "min_angle_degree: "<< min_angle_degree << endl;
 		cout << "max_angle_degree: "<< max_angle_degree << endl;
@@ -334,20 +486,22 @@ URG_touch_screen::Point URG_touch_screen::find_min(Point* points, bool is_x){
 
 float URG_touch_screen::area_triangle(float x1, float y1, float x2, float y2, float x3, float y3)
 {
-    return abs((x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2)) / 2.0);
+    return (float) abs(((float)x1 * (float)(y2 - y3) + (float)x2 * (float)(y3 - y1) + (float)x3 * (float)(y1 - y2)) / 2.0);
 }
  
 bool URG_touch_screen::is_piont_in_rectangle(Point P1, Point P2, Point P3, Point P4, float x, float y)
 {
     float A = area_triangle(P1.x, P1.y, P2.x, P2.y, P3.x, P3.y) + area_triangle(P1.x, P1.y, P4.x, P4.y, P3.x, P3.y);
  
-    float A1 = area_triangle(x, y, P1.x, P1.y, P2.y, P2.y);
+    float A1 = area_triangle(x, y, P1.x, P1.y, P2.x, P2.y);
  
     float A2 = area_triangle(x, y, P2.x, P2.y, P3.x, P3.y);
 
     float A3 = area_triangle(x, y, P3.x, P3.y, P4.x, P4.y);
  
     float A4 = area_triangle(x, y, P1.x, P1.y, P4.x, P4.y);
+
+	cout << "A=  "<< A << " B= " << A1 + A2 + A3 + A4 << endl;
  
     return (A == A1 + A2 + A3 + A4);
 }

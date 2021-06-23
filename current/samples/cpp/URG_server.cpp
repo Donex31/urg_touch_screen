@@ -3,7 +3,8 @@
 
 int main()
 {
-    std::string localhost = "192.168.43.4";
+    //std::string localhost = "192.168.43.4";
+    std::string localhost = "localhost";
     std::string port = "8888";
     std::string endpoint = "/";
 
