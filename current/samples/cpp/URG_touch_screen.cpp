@@ -131,45 +131,45 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 		screen_matrix[i].resize(width);
 
 	//Kalman Filter
-	int n_states = 2;
-	int n_outputs = 2;
-	mat A(n_states, n_outputs), B(n_states, n_outputs), H(n_states, n_outputs), Q(n_states, n_outputs), R(n_states, n_outputs);
+	//int n_states = 2;
+	//int n_outputs = 2;
+	//mat A(n_states, n_outputs), B(n_states, n_outputs), H(n_states, n_outputs), Q(n_states, n_outputs), R(n_states, n_outputs);
 
-	A << 1 << 0 << endr
-		<< 0 << 1 << endr;
+	//A << 1 << 0 << endr
+	//	<< 0 << 1 << endr;
 
-	H << 1 << 0 << endr
-		<< 0 << 1 << endr;
+	//H << 1 << 0 << endr
+	//	<< 0 << 1 << endr;
 
-	std::cout << "A: \n" << A << std::endl;
-	std::cout << "H: \n" << H << std::endl;
+	//std::cout << "A: \n" << A << std::endl;
+	//std::cout << "H: \n" << H << std::endl;
 
-	B = B.zeros();
+	//B = B.zeros();
 
-	double alpha = 1.5;
-	double sigma = 3;
+	//double alpha = 1.5;
+	//double sigma = 3;
 
-	Q = alpha * Q.eye();
+	//Q = alpha * Q.eye();
 
-	R = sigma * R.eye();
+	//R = sigma * R.eye();
 
-	std::cout << "B: \n" << B << std::endl;
-	std::cout << "Q: \n" << Q << std::endl;
-	std::cout << "R: \n" << R << std::endl;
+	//std::cout << "B: \n" << B << std::endl;
+	//std::cout << "Q: \n" << Q << std::endl;
+	//std::cout << "R: \n" << R << std::endl;
 
-	colvec x0(2);
-	x0 << 0 << 8;
+	//colvec x0(2);
+	//x0 << 0 << 8;
 
-	mat P0(2, 2);
-	P0 = 3 * P0.eye();
+	//mat P0(2, 2);
+	//P0 = 3 * P0.eye();
 
-	KF kalman;
+	//KF kalman;
 	//MyEKF myekf;
 	//MyUKF myukf;
 
-	kalman.InitSystem(A, B, H, Q, R);
-	kalman.InitSystemState(x0);
-	kalman.InitStateCovariance(P0);
+	//kalman.InitSystem(A, B, H, Q, R);
+	//kalman.InitSystemState(x0);
+	//kalman.InitStateCovariance(P0);
 
 	//myekf.InitSystem(n_states, n_outputs, Q, R);
 	//myekf.InitSystemState(x0);
@@ -179,11 +179,11 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 	//myukf.InitSystemState(x0);
 	//myukf.InitSystemStateCovariance(P0);
 
-	colvec z(2);
-	colvec u(2);
+	//colvec z(2);
+	//colvec u(2);
 
 	// No inputs, system subjects only to random perturbation
-	u = u.zeros();
+	//u = u.zeros();
 	//
 
 	urg.start_measurement(Urg_driver::Distance, scan_times, skip_scan);
@@ -246,11 +246,11 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 				continue;
 			}
 
-			z(0, 0) = x_index;
-			z(1, 0) = y_index;
+			//z(0, 0) = x_index;
+			//z(1, 0) = y_index;
 
-			kalman.Kalmanf(z, u);
-			colvec* z = kalman.GetCurrentEstimatedOutput();
+			//kalman.Kalmanf(z, u);
+			//colvec* z = kalman.GetCurrentEstimatedOutput();
 
 			//myekf.EKalmanf(z, u);
 			//colvec* z = myekf.GetCurrentEstimatedOutput();
@@ -263,7 +263,7 @@ void  URG_touch_screen::start_reading_data_from_sensor(int width, int height, do
 
 			cout << "(" << x_index << ", " << y_index << ")" << endl;
 			myfile << "(" << x_index << ", " << y_index << "),";
-			//auto f = async(launch::async, &URG_touch_screen::send_request_to_xinuk, this, x_index, y_index, width, height, screen_width, screen_height, screens_urls);
+			auto f = async(launch::async, &URG_touch_screen::send_request_to_xinuk, this, x_index, y_index, width, height, screen_width, screen_height, screens_urls);
 		}
 	}
 	myfile.close();
@@ -334,7 +334,13 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 
 
 	int i = 0;
-	while (i<10)
+	int it = 0;
+	
+	p_LT.x = 0;
+	p_LT.y = 0;
+	p_RB.x = 0;
+	p_RB.y = 0;
+	while (i < 50)
 	{
 		i++;
 		vector<long> data;
@@ -362,19 +368,31 @@ bool URG_touch_screen::calibrate(int width, int height, double pixel_size, bool 
 			}
 
 			if(is_point_00){
-				p_LT.x = (float)x;
-				p_LT.y = (float)y;
-				cout << "x_LT: " << x << " y_LT: " << y << endl;
-				calibratedLT  = true;
-				break;
+				p_LT.x = p_LT.x + (float)x;
+				p_LT.y = p_LT.y + (float)y;
 			}
 			else
 			{
-				p_RB.x = (float)x;
-				p_RB.y = (float)y;
-				cout << "x_RB: " << x << " y_RB: " << y << endl;
-				calibratedRB  = true;
-				break;
+				p_RB.x = p_RB.x + (float)x;
+				p_RB.y = p_RB.y + (float)y;
+			}
+			
+			if(it != 0)
+			{
+				if(is_point_00)
+				{
+					p_LT.x = p_LT.x / it;
+					p_LT.y = p_LT.y / it;
+					cout << "x_LT: " << p_LT.x << " y_LT: " << p_LT.y << endl;
+					calibratedLT  = true;
+				}
+				else
+				{
+					p_RB.x = p_RB.x / it;
+					p_RB.y = p_RB.y / it;
+					cout << "x_RB: " << p_RB.x << " y_RB: " << p_RB.y << endl;
+					calibratedRB  = true;
+				}
 			}
 			
 		}
